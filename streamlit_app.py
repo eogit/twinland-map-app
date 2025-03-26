@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-st.title("🎈 Twinland map app")
+st.title("🎈 Test app")
 st.write(
     "Deployed on [docs.streamlit.io](https://docs.streamlit.io/)."
 )
