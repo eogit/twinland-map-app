@@ -18,5 +18,9 @@ st.bar_chart(df, x="Field", y="NEE")
 number = st.slider("Raise water table to (cm below surface): ", 10, 150)
 df = pd.DataFrame(data)
 df["new_NEE"] = df["NEE"] * number/150
-st.title("Dashboard")
+st.title("WTD Dashboard")
 st.bar_chart(df, x="Field", y="new_NEE")
+
+# Then exit() Python and type into the terminal:
+# streamlit run /workspaces/twinland-map-app/streamlit_app.py
+# and open the Local URL
