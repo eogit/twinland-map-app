@@ -31,7 +31,7 @@ if vector_file:
             c = Point(0, 0)
     else:
         # Use the existing clicked point from session state
-        c = st.session_state['clicked_point']
+        c = Point(st.session_state.clicked_point['lon'], st.session_state.clicked_point['lat'])
     
     # Check if the Point is contained in any of the polygons
     matches = gdf[gdf.geometry.contains(c)]
@@ -43,13 +43,25 @@ if vector_file:
 
     # Display map with polygons centred on the geodataframe or restored view from session state
     centroid = gdf.geometry.centroid
+    #st.write("Centroid:", centroid.y.mean(), centroid.x.mean())
+
     # Check if 'zoom' and 'center' exist in session state
-    if 'center' not in st.session_state:
-        st.write("No center in session state.")
-        st.session_state.center = {'lat': centroid.y.mean(), 'lng': centroid.x.mean()}
-    if 'zoom' not in st.session_state:
-        st.write("No zoom in session state.")
+    if 'center' not in st.session_state or st.session_state["center"] == []:
+        #st.write("No center in session state.")
+        st.session_state["center"] = {
+            'lat': centroid.y.mean(), 
+            'lng': centroid.x.mean()
+            }
+    if 'zoom' not in st.session_state or st.session_state['zoom'] == []:
+        #st.write("No zoom in session state.")
         st.session_state['zoom'] = 11
+
+    st.write("Session state:")
+    st.write(st.session_state)
+    #st.write("Session state center:")
+    #st.write(st.session_state.center)
+    #st.write("Session state zoom:")
+    #st.write(st.session_state['zoom'])
 
     m = folium.Map(location=[st.session_state.center['lat'], st.session_state.center['lng']], zoom_start=st.session_state['zoom'])
 
@@ -124,20 +136,31 @@ if vector_file:
         #selected_polygon = None
 
     # Hack into the session state to get the map's zoom and center and preserve them
-    #st.write("Session state after clicking:")
-    #st.write(st.session_state)
-    i=0
+    st.write("Session state after clicking:")
+    st.write(st.session_state)
+    st.write("Number of keys: ", len(st.session_state.items()))
+    for k,v in st.session_state.items():
+        st.write(k, ": ", v)
+    #st.write("Session context:")
+    #st.write(st.context.cookies)
+    #st.write(st.context.headers)
+
     for key, value in st.session_state.items():
-        i+=1
-        if i==3:
-            st.write(f"{key}: {value}")
-            zoom = [v for k,v in value.items() if k == 'zoom'][0]
-            #TODO: center is a dict with lat and lng in the first map but then it is set to a Point object
-            center = [v for k,v in value.items() if k == 'center'][0]
-            st.write("Zoom:", zoom)
-            st.write("Center:", center)
-            st.session_state['zoom'] = zoom
-            st.session_state['center'] = center
+        if len(key)>60:
+            #st.write(f"{key}: {value}")
+            #st.write("Session state key:", key)
+            #st.write("Inside this key:")
+            for k,v in value.items():
+                #st.write(k, ": ", v)
+                if k == 'zoom':
+                    zoom = v
+                    #st.write("Zoom: ", zoom)
+                if k=="center":
+                    center = v
+                    #st.write("Center: ", center)
+    st.session_state['zoom'] = zoom
+    st.session_state['center'] = center
+
     #TODO: Refresh the map in Streamlit
 
 
