@@ -1,8 +1,10 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import folium
 from streamlit_folium import st_folium
 import geopandas as gpd
+from shapely.geometry import Point, Polygon, shape
 import requests
 
 st.title("Twinland map app")
@@ -11,27 +13,69 @@ st.write(
 )
 
 vector_file = 'Polygons_small.shp'
+
 if vector_file:
     # Read the vector file
     gdf = gpd.read_file(vector_file)
+
+    # Initialization
+
+    #st.write("Session state:")
+    #st.write(st.session_state)
+
+    # Check if 'clicked_point' exists in session state
+    if 'clicked_point' not in st.session_state:
+        st.session_state['clicked_point'] = Point(0, 0)
+        # Make sure c exists
+        if 'c' not in locals() and 'c' not in globals():
+            c = Point(0, 0)
+    else:
+        # Use the existing clicked point from session state
+        c = st.session_state['clicked_point']
     
-    # Display map with polygons
-    m = folium.Map(location=[gdf.geometry.centroid.y.mean(), gdf.geometry.centroid.x.mean()], zoom_start=12)
+    # Check if the Point is contained in any of the polygons
+    matches = gdf[gdf.geometry.contains(c)]
+    st.write("Matches:", matches.geometry)
+    if len(matches.geometry) > 0:
+        st.write("Point is contained in polygon(s).")
+    else:
+        st.write("WARNING: Point not contained in polygons.")
+
+    # Display map with polygons centred on the geodataframe or restored view from session state
+    centroid = gdf.geometry.centroid
+    # Check if 'zoom' and 'center' exist in session state
+    if 'center' not in st.session_state:
+        st.write("No center in session state.")
+        st.session_state.center = {'lat': centroid.y.mean(), 'lng': centroid.x.mean()}
+    if 'zoom' not in st.session_state:
+        st.write("No zoom in session state.")
+        st.session_state['zoom'] = 11
+
+    m = folium.Map(location=[st.session_state.center['lat'], st.session_state.center['lng']], zoom_start=st.session_state['zoom'])
 
     # Add polygons to the map
     polygon_layers = {}
-   
     for idx, row in gdf.iterrows():
+        c = st.session_state['clicked_point']
+        style_function=lambda feature: {
+            "fillColor": "yellow" 
+            if shape(feature["geometry"]).contains(c)
+            else "green",
+            "color": "black",
+            "weight": 2,
+            "fillOpacity": 0.8
+        }
+
+        # Create a GeoJson layer for each polygon
         layer = folium.GeoJson(
             row.geometry,
             name=f"Polygon {idx}",
-            style_function=lambda x: {"fillColor": "blue", "color": "black", "weight": 2}
+            style_function=style_function
         )
         layer.add_to(m)
-        polygon_layers[f"Polygon {idx}"] = layer
+        #st.write("Layer:", layer.__dict__)
 
-    #for _, row in gdf.iterrows():
-    #    folium.GeoJson(row.geometry, name=row['id']).add_to(m)
+        polygon_layers[f"Polygon {idx}"] = layer
 
     # Display the map in Streamlit
     st_data = st_folium(m, width=700, height=500)
@@ -52,44 +96,60 @@ if vector_file:
             }
             # payload is for handing over to the digital twin API
             st.write("Selected field:", payload)
+            st.write("This is where the API of the DT is called.")
+            #TODO: Call DT API here:
+            #response = requests.post("https://your-api-url.com", json=payload)
+            #st.write("API Response:", response.json())
+        else:
+            st.write("Select a polygon first.")
 
     # Highlight clicked polygon
     if st_data.get("last_clicked"):
-        lat, lon = st_data["last_clicked"]["lat"], st_data["last_clicked"]["lng"]
+        # Extract selected polygon coordinates
+        selected = st_data.get("last_clicked", None)
+        if selected:
+            lat, lon = selected["lat"], selected["lng"]
 
         # Find the polygon containing the clicked point
         clicked_point = gpd.GeoDataFrame(geometry=[gpd.points_from_xy([lon], [lat])[0]], crs=gdf.crs)
-        selected_polygon = gdf[gdf.contains(clicked_point.geometry.iloc[0])]
+        st.session_state['clicked_point'] = {
+            "lon:" lon, 
+            "lat": lat
+            }
+        c = Point(lon,lat)
+        st.write("Selected coordinates:", st.session_state['clicked_point'])
+        #selected_polygon = gdf[gdf.contains(clicked_point.geometry.iloc[0])]
+    else:
+        clicked_point = None
+        #selected_polygon = None
 
-        if not selected_polygon.empty:
-            # Highlight the selected polygon
-            m = folium.Map(
-                location=[gdf.geometry.centroid.y.mean(), gdf.geometry.centroid.x.mean()],
-                zoom_start=12
-            )
-           
-            for idx, row in gdf.iterrows():
-                color = "yellow" if row.geometry == selected_polygon.geometry.iloc[0] else "blue"
-                folium.GeoJson(
-                    row.geometry,
-                    style_function=lambda x, color=color: {
-                        "fillColor": color,
-                        "color": "black",
-                        "weight": 3
-                    }
-                ).add_to(m)
+    # Hack into the session state to get the map's zoom and center and preserve them
+    #st.write("Session state after clicking:")
+    #st.write(st.session_state)
+    i=0
+    for key, value in st.session_state.items():
+        i+=1
+        if i==3:
+            st.write(f"{key}: {value}")
+            zoom = [v for k,v in value.items() if k == 'zoom'][0]
+            #TODO: center is a dict with lat and lng in the first map but then it is set to a Point object
+            center = [v for k,v in value.items() if k == 'center'][0]
+            st.write("Zoom:", zoom)
+            st.write("Center:", center)
+            st.session_state['zoom'] = zoom
+            st.session_state['center'] = center
+    #TODO: Refresh the map in Streamlit
 
-            # Redisplay the map with highlighting
-            st_folium(m, width=700, height=500)
-        
-            '''
-            response = requests.post("https://your-api-url.com", json=payload)
-            st.write("API Response:", response.json())
-            '''
-        
-        else:
-            st.write("Please select a polygon on the map.")
+
 
 # Then to deploy it, type:
 # streamlit run twinland-app.py
+# or
+# streamlit run twinland-app.py --server.enableCORS false --server.enableXsrfProtection false
 # and open the browser at the provided Local URL
+
+
+#TODO: multiple columns
+#col1, col2 = st.columns(2)
+#with col1:
+
