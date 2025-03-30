@@ -113,7 +113,7 @@ if vector_file:
         # Find the polygon containing the clicked point
         clicked_point = gpd.GeoDataFrame(geometry=[gpd.points_from_xy([lon], [lat])[0]], crs=gdf.crs)
         st.session_state['clicked_point'] = {
-            "lon:" lon, 
+            "lon": lon, 
             "lat": lat
             }
         c = Point(lon,lat)
