@@ -7,10 +7,6 @@ import geopandas as gpd
 from shapely.geometry import Point, Polygon, shape
 import requests
 
-# initialise session state
-#if 'key' not in st.session_state:
-#    st.session_state['key'] = 'value'
-
 def get_session_state(session_state):     
     zoom = 11
     center = {}
@@ -49,12 +45,18 @@ if vector_file:
     # Read the vector file
     gdf = gpd.read_file(vector_file)
 
+    # remove polygon with id == 11 (specific to this dataset)
+    gdf = gdf.drop(gdf[gdf.id==11].index)
+    #st.write("GeoDataFrame:", gdf)]
+    
     # Initialization
     #st.write("Session state:")
     #st.write(st.session_state)
 
+    #TODO: DOES NOT WORK YET.
     # Get session state values for the current session
     zoom, center, clicked_point = get_session_state(st.session_state)
+    st.write("Clicked point:", clicked_point)
 
     # Check if 'clicked_point' exists in session state
     #if 'clicked_point' not in st.session_state:
@@ -67,7 +69,6 @@ if vector_file:
     #    c = st.session_state.clicked_point
     
     # Check if the Point is contained in any of the polygons
-    st.write("Clicked point:", clicked_point)
     matches = gdf[gdf.geometry.contains(clicked_point)]
     st.write("Matches:", matches.geometry)
     if len(matches.geometry) > 0:
@@ -89,8 +90,8 @@ if vector_file:
     #if zoom == 0:
     #    st.session_state['zoom'] = 11
 
-    st.write("Session state before making map:")
-    st.write(st.session_state)
+    #st.write("Session state before making map:")
+    #st.write(st.session_state)
 
     #m = folium.Map(location=[st.session_state.center['lat'], st.session_state.center['lng']], zoom_start=st.session_state['zoom'])
     m = folium.Map(location=[lat, lon], zoom_start=zoom)
@@ -145,50 +146,50 @@ if vector_file:
     # Highlight clicked polygon
     if st_data.get("last_clicked"):
         # Extract selected polygon coordinates
-        selected = st_data.get("last_clicked", None)
-        if selected:
-            lat, lon = selected["lat"], selected["lng"]
+        selected = st_data.get("last_clicked")
+        lat, lon = selected["lat"], selected["lng"]
 
-            # Update session state with the clicked point
-            st.session_state['clicked_point'] = Point(lon, lat)
-            clicked_point = Point(lon, lat)
+        # Update session state with the clicked point
+        clicked_point = Point(lon, lat)
+        st.session_state.clicked_point = clicked_point
+        st.write("Clicked point:", clicked_point)
 
-            # Ensure the CRS of the clicked point matches the GeoDataFrame
-            #clicked_point_gdf = gpd.GeoDataFrame(geometry=[clicked_point], crs=gdf.crs)
+        # Ensure the CRS of the clicked point matches the GeoDataFrame
+        #clicked_point_gdf = gpd.GeoDataFrame(geometry=[clicked_point], crs=gdf.crs)
 
-            # Find the polygon containing the clicked point
-            selected_polygon = gdf[gdf.geometry.contains(clicked_point)]
+        # Find the polygon containing the clicked point
+        selected_polygon = gdf[gdf.geometry.contains(clicked_point)]
 
-            if not selected_polygon.empty:
-                st.write("Selected polygon(s):", selected_polygon)
+        if not selected_polygon.empty:
+            st.write("Selected polygon(s):", selected_polygon)
 
-                # Add the highlighted polygon to the map
-                for _, row in selected_polygon.iterrows():
-                    folium.GeoJson(
-                        row.geometry,
-                        style_function=lambda x: {
-                            'fillColor': 'yellow',
-                            'color': 'black',
-                            'weight': 2,
-                            'fillOpacity': 0.7
-                        },
-                        tooltip=folium.features.GeoJsonTooltip(
-                            fields=gdf.columns.tolist(),  # Use existing columns in GeoDataFrame
-                            aliases=gdf.columns.tolist(),  # Use column names as aliases
-                            sticky=True
-                        ),
-                    ).add_to(m)
+            # Add the highlighted polygon to the map
+            for _, row in selected_polygon.iterrows():
+                folium.GeoJson(
+                    row.geometry,
+                    style_function=lambda x: {
+                        'fillColor': 'yellow',
+                        'color': 'black',
+                        'weight': 2,
+                        'fillOpacity': 0.7
+                    },
+                    tooltip=folium.features.GeoJsonTooltip(
+                        fields=gdf.columns.tolist(),  # Use existing columns in GeoDataFrame
+                        aliases=gdf.columns.tolist(),  # Use column names as aliases
+                        sticky=True
+                    ),
+                ).add_to(m)
 
                 # Re-render the updated map in Streamlit
-                st_data = st_folium(m, width=700, height=500)
-            else:
-                st.write("No polygon contains the selected point.")
+                #st_data = st_folium(m, width=700, height=500)
         else:
-            st.write("No point selected.")
+            st.write("No polygon contains the selected point.")
+            # Store session state values for the current session
+        st.session_state['zoom'] = zoom
+        st.session_state['center'] = center
+    else:
+        st.write("No point selected.")
         
-    # Store session state values for the current session
-    st.session_state['zoom'] = zoom
-    st.session_state['center'] = center
 
 # Then to deploy it, type:
 # streamlit run twinland-app.py
