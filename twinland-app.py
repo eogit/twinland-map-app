@@ -11,18 +11,18 @@ import geopandas as gpd
 from shapely.geometry import Point, Polygon, shape
 import requests
 
-def get_session_state(session_state, verbose=True):     
+def get_session_state(session_state, verbose=False):     
+    f = open("logfile.txt", "a")
     zoom = 11
     center = {}
     clicked_point = Point(0, 0)
     # step 1: Get the current session state ID (longer than 60 characters)
-    if verbose:
-        st.write("Session state:", session_state)
+    f.write("_"*40 + "\n")
     for key, value in session_state.items():
+        f.write(str(key) + ": " + str(value) + "\n")
         if len(key)>60:
-            if verbose:
-                st.write(f"{key}: {value}")
-                st.write("Session state key:", key)
+            f.write(f"{key}: {value}")
+            f.write("Session state key:" + str(key))
             if key == "last_clicked" and value is not None:
                 clicked_point = value
                 if verbose:
@@ -30,10 +30,9 @@ def get_session_state(session_state, verbose=True):
             # step 2: Get the session state values from within the current session
             if value is not None:
                 if verbose:
-                    st.write("Inside this key:")
+                    f.write("Inside this key:\n")
                 for k,v in value.items():
-                    if verbose:
-                        st.write(k, ": ", v)
+                    f.write(str(k)+ ": " + v + "\n")
                     if k == 'zoom':
                         zoom = v
                         if verbose:
@@ -51,6 +50,7 @@ def get_session_state(session_state, verbose=True):
         st.write("Zoom:", zoom)
         st.write("Center:", center)
         st.write("Clicked Point:", clicked_point)
+    f.close()
     return(zoom, center, clicked_point)
 
 
@@ -135,7 +135,7 @@ if os.path.isfile(vector_file):
         else:
             st.write("Select a polygon first.")
 
-    # Highlight clicked polygon
+    # Check if the user clicked on the map
     if st_data.get("last_clicked"):
         # Extract selected polygon coordinates
         selected = st_data.get("last_clicked")
@@ -143,35 +143,12 @@ if os.path.isfile(vector_file):
 
         # Update session state with the clicked point
         clicked_point = Point(lon, lat)
-        st.session_state.clicked_point = clicked_point
 
         selected_polygon = gdf[gdf.geometry.contains(clicked_point)]
         if not selected_polygon.empty:
             st.write("Selected polygon(s):", selected_polygon)
 
-        '''
-            # Add the highlighted polygon to the map
-            for _, row in selected_polygon.iterrows():
-                folium.GeoJson(
-                    row.geometry,
-                    style_function=lambda x: {
-                        'fillColor': 'yellow',
-                        'color': 'black',
-                        'weight': 2,
-                        'fillOpacity': 0.7
-                    },
-                    tooltip=folium.features.GeoJsonTooltip(
-                        fields=gdf.columns.tolist(),  # Use existing columns in GeoDataFrame
-                        aliases=gdf.columns.tolist(),  # Use column names as aliases
-                        sticky=True
-                    ),
-                ).add_to(m)
-
-                # Re-render the updated map in Streamlit
-                #st_data = st_folium(m, width=700, height=500)
-        else:
-            st.write("No polygon contains the selected point.")
-            # Store session state values for the current session
-        '''
+        # Update session state with the clicked point and map view
+        st.session_state.clicked_point = clicked_point
         st.session_state['zoom'] = zoom
         st.session_state['center'] = center
